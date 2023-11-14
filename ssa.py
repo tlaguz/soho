@@ -27,5 +27,10 @@ AND observation.instrument_name='LASCO' order by observation.begin_date desc&PAG
 
     def get_file(self, oid):
         url = "https://ssa.esac.esa.int/ssa-sl-tap/data?retrieval_type=OBSERVATION&QUERY=\
-WHERE observation.observation_oid IN ("+str(oid)+")&compress=false"
-        return requests.get(url).content
+WHERE observation.observation_oid="+str(oid)+"&compress=false"
+        while True:
+            try:
+                return requests.get(url).content
+            except:
+                print("Retrying...")
+                continue

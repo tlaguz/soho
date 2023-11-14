@@ -1,6 +1,7 @@
 import requests
 import time
 import os
+import threading
 
 from observations_repository import observations_repository
 from ssa import ssa
@@ -64,23 +65,40 @@ class observations_manager:
 
         open(self.make_path(path, filename), 'wb').write(f)
 
+        #print("Downloaded " + str(observation_oid) + " to " + self.make_path(path, filename))
+
     def download_data(self):
         count = self.repo.get_count()
+        i = 0
+        page_size = 20
         print("Total observations: " + str(count))
-        pages = int(count / 1000) + 1
+        pages = int(count / page_size) + 1
         print("Total pages: " + str(pages))
         for page in range(1, pages + 1):
+            threads = []
+            start = time.time()
             print("Downloading page " + str(page) + "...")
-            observations = self.repo.get_observations(page)
+            observations = self.repo.get_observations(page, page_size)
             for observation in observations:
+                i = i+1
                 path = observation[10]
                 filename = observation[9]
                 oid = observation[13]
 
                 if os.path.exists(self.make_path(path, filename)):
-                    print("!!! Skipping " + str(observation[13]))
+                    #print("["+str(i)+"/"+str(count)+" ; page "+str(page)+"/"+str(pages)+"] Skipping " + str(observation[13]))
                     continue
 
-                print("Downloading " + str(oid) + "...")
+                #print("["+str(i)+"/"+str(count)+" ; page "+str(page)+"/"+str(pages)+"] Downloading " + str(oid) + "...")
 
-                self.download_file(oid, path, filename)
+                download_thread = threading.Thread(target=self.download_file, args=(oid, path, filename))
+                download_thread.start()
+                threads.append(download_thread)
+
+            for thread in threads:
+                thread.join()
+
+            end = time.time()
+            print("Page "+str(page)+"/"+str(pages)+" downloaded in " + str(end - start) + " seconds")
+            print("Observations per second: " + str(page_size / (end - start)))
+            print("Estimated time left: " + str((pages - page) * (end - start) / 60/60) + " hours")

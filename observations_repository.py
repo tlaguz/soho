@@ -101,7 +101,7 @@ SELECT * FROM observations WHERE observation_oid = ?
 SELECT COUNT(*) FROM observations
         """).fetchone()[0]
 
-    def get_observations(self, page):
+    def get_observations(self, page, page_size = 1000):
         return self.cursor.execute("""
-SELECT * FROM observations LIMIT 1000 OFFSET ?
-        """, ((page - 1) * 1000,)).fetchall()
+SELECT * FROM observations LIMIT ? OFFSET ?
+        """ , (page_size, (page - 1) * page_size)).fetchall()

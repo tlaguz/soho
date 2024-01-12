@@ -1,1 +1,12 @@
 requests
+
+sunpy
+astropy
+matplotlib
+scipy
+bs4
+lxml
+zeep
+drms
+
+beautifulsoup4

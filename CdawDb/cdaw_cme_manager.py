@@ -7,7 +7,7 @@ from datetime import datetime
 from cdaw import cdaw
 from cdaw_cme_repository import cdaw_cme_repository
 
-class observations_manager:
+class cdaw_cme_manager:
     def __init__(self, dbconn):
         self.dbconn = dbconn
         self.repo = cdaw_cme_repository(dbconn)

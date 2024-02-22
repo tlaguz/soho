@@ -46,7 +46,15 @@ class Previewer:
         training_metadata = TrainingMetadata(metadata_file)
         list = training_metadata.read()
 
-        # print using matplotlib list[].epoch_loss
+        local_ranks = set([x.local_rank for x in list])
+
         fig, axs = plt.subplots(1, 1, figsize=(10, 10))
-        axs.plot([x.epoch_loss for x in list])
+
+        axs.set_title('Epoch Loss')
+        axs.set_xlabel('Iteration')
+        axs.set_ylabel('Loss')
+
+        for local_rank in local_ranks:
+            axs.plot([x.epoch_loss for x in list if x.local_rank == local_rank])
+
         plt.show()

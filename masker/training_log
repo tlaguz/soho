@@ -1,0 +1,17 @@
+bf16, lr 0.0001, batch_size 64, log interval, mask True
+# Źle generalizuje chyba przez bf16. Próbuję fp32
+
+fp32, lr 0.0001, batch_size 30, log interval 32, mask True
+# Sieć zwraca wszędzie ~0.5. Podejrzana normalizacja? Wyłączam normalizację running diff.
+# Może przydałoby się trenować sieć na różnym natężeniu diffa mnożąc odjemną przez 1.0 - 3.0?
+
+fp32, lr 0.0001, batch_size 30, log interval 32, mask True, running diff bez normalizacji
+# W animate prawdopodobieństwa są odwrócone. Zmieniam binary_cross_entropy_with_logits na binary_cross_entropy
+
+fp32, lr 0.0001, batch_size 30, log interval 32, mask True, running diff bez normalizacji
+# poprawiłem inferencje. Poprzednie próby były źle oceniane przez to. Przywracam normalizację running diff.
+# katalog: training_4
+
+fp32, lr 0.0001, batch_size 30, log interval 32, mask True, running diff z normalizacją
+# Dodaję drugi kanał do unet, do którego przekazuję running diff z poprzedniej klatki.
+# katalog: training_5

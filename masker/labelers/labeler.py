@@ -13,10 +13,10 @@ class Labeler:
         label = np.zeros((self.height, self.width))
 
         for i in range(len(rows)):
-            coordinate_x = rows[i]
-            coordinate_y = cols[i]
+            coordinate_y = rows[i]
+            coordinate_x = cols[i]
             coordinate_x, coordinate_y = rotate_by_fits_header(coordinate_x, coordinate_y, fits_header)
-            label += create_gaussian(self.height, self.width, coordinate_x, coordinate_y, self.sigma)
+            label += create_gaussian(self.height, self.width, coordinate_y, coordinate_x, self.sigma)
 
         if np.max(label) != 0:
             label /= np.max(label)

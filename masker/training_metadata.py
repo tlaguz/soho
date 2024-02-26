@@ -12,6 +12,7 @@ class TrainingMetadataDto:
     epoch_loss: float
     running_loss: float
     loss: float
+    valid_loss: float
     checkpoint_tag: str
 
 # used to read and save training metadata

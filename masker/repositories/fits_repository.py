@@ -1,5 +1,8 @@
 from dataclasses import dataclass
 
+from masker.repositories.cache import Cache
+
+
 @dataclass
 class FitsDto:
     filename: str
@@ -17,6 +20,7 @@ class FitsPointDto(FitsDto):
 class FitsRepository:
     def __init__(self, dbconn):
         self.dbconn = dbconn
+        self.cache = Cache("fits_repository")
 
     def add_fits(self, fits: FitsDto):
         cursor = self.dbconn.cursor()
@@ -44,6 +48,13 @@ class FitsRepository:
         self.dbconn.commit()
 
     def get_fits_points_by_yht_filename(self, filename_yht):
+        hash = self.cache.get_hash(filename_yht)
+        key = f"fits_by_yht_{hash}"
+
+        result = self.cache.get(key)
+        if result is not None:
+            return result
+
         cursor = self.dbconn.cursor()
         cursor.execute("""
         select                     
@@ -65,9 +76,18 @@ class FitsRepository:
             yht_point.filename = ?;
         """, (filename_yht,))
         result = cursor.fetchall()
-        return [FitsPointDto(*row) for row in result]
+        result = [FitsPointDto(*row) for row in result]
+        self.cache.set(key, result)
+        return result
 
     def get_previous_fits(self, filename):
+        hash = self.cache.get_hash(filename)
+        key = f"previous_fits_{hash}"
+
+        result = self.cache.get(key)
+        if result is not None:
+            return result
+
         cursor = self.dbconn.cursor()
         cursor.execute("""
 WITH temp_table AS (
@@ -103,4 +123,6 @@ WHERE
     ) - 1;
         """, (filename,filename))
         result = cursor.fetchone()
-        return FitsDto(*result) if result is not None else None
+        result = FitsDto(*result) if result is not None else None
+        self.cache.set(key, result)
+        return result

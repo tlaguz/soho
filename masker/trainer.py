@@ -3,6 +3,7 @@ import os
 import sqlite3
 from datetime import datetime
 
+import numpy as np
 import torch
 import torchvision
 import deepspeed
@@ -13,14 +14,15 @@ import torch.nn as nn
 import torch.nn.functional as F
 from deepspeed import get_accelerator
 
-from masker.dataset import FitsDataset
+from masker.datasets.create_dataset import create_dataset, create_validation_dataset
 from masker.losses.loss_factory import create_loss
 from masker.models.model_factory import create_model
 
 from masker.previewer import Previewer
 from masker.training_metadata import TrainingMetadata, TrainingMetadataDto
+from masker.utils import get_paths
 
-save_dir = '/mnt/mlpool/soho_seiji/checkpoints/'
+paths = get_paths()
 
 def add_argument():
 
@@ -40,7 +42,7 @@ def add_argument():
     # train
     parser.add_argument('-b',
                         '--batch_size',
-                        default=8,
+                        default=7,
                         type=int,
                         help='mini-batch size (default: 16)')
     parser.add_argument('-e',
@@ -72,6 +74,13 @@ def add_argument():
         choices=['bf16', 'fp16', 'fp32'],
         help=
         'Datatype used for training'
+    )
+    parser.add_argument(
+        '--checkpoint',
+        default=None,
+        type=str,
+        help=
+        'Checkpoint to resume'
     )
     parser.add_argument(
         '--stage',
@@ -170,17 +179,33 @@ if __name__ == '__main__':
     dbconn = sqlite3.connect('/home/tlaguz/db.sqlite3', timeout=300000.0)
     dbconn.row_factory = sqlite3.Row
 
-    net = create_model()
+    model_wrapper = create_model()
+    net = model_wrapper.get_model()
 
     parameters = filter(lambda p: p.requires_grad, net.parameters())
     parameters_count = sum(p.numel() for p in net.parameters() if p.requires_grad)
 
-    training_metadata = TrainingMetadata(os.path.join(save_dir, "training_metadata.json"))
+    training_metadata = TrainingMetadata(os.path.join(paths.save_dir, "training_metadata.json"))
 
-    train_set = FitsDataset(dbconn, '/mnt/mlpool/soho_seiji/', running_diff=True, mask_disk=True, dtype=args.dtype)
+    train_set = create_dataset(dbconn, args.dtype)
+    train_sampler = torch.utils.data.distributed.DistributedSampler(
+        train_set,
+        num_replicas=torch.distributed.get_world_size(),
+        rank=torch.distributed.get_rank())
+    train_loader = torch.utils.data.DataLoader(
+        train_set,
+        batch_size=int(args.batch_size/torch.distributed.get_world_size()),
+        shuffle=False,
+        num_workers=1,
+        pin_memory=True,
+        sampler=train_sampler)
+    valid_set = create_validation_dataset(dbconn, args.dtype)
 
     model_engine, optimizer, trainloader, __ = deepspeed.initialize(
         args=args, model=net, model_parameters=parameters, training_data=train_set, config=ds_config)
+
+    if args.checkpoint is not None:
+        model_engine.load_checkpoint(args.checkpoint)
 
     local_device = get_accelerator().device_name(model_engine.local_rank)
     local_rank = model_engine.local_rank
@@ -190,18 +215,22 @@ if __name__ == '__main__':
     start_time = time.time()
 
     for epoch in range(args.epochs):  # loop over the dataset multiple times
-
         epoch_loss = 0.0
         running_loss = 0.0
-        for i, data in enumerate(trainloader):
+
+        train_sampler.set_epoch(epoch)
+
+        for i, data in enumerate(train_loader):
             # get the inputs; data is a list of [inputs, labels]
             inputs, labels, filenames = (
                 data[0].type(args.dtype_torch).to(local_device),
                 data[1].type(args.dtype_torch).to(local_device),
                 data[2])
 
-            outputs = model_engine(inputs.view(-1, 1, 1024, 1024))
-            outputs = outputs.view(-1, 1024, 1024)
+            model_outputs = model_engine(model_wrapper.input_preprocess(inputs))
+            outputs = model_wrapper.output_postprocess(model_outputs)
+            labels = model_wrapper.labels_preprocess(labels)
+
             loss = criterion(outputs, labels)
 
             model_engine.backward(loss)
@@ -217,13 +246,38 @@ if __name__ == '__main__':
             if i % args.log_interval == (args.log_interval - 1):
                 checkpoint_tag = f'model_{epoch}-{i}.bin'
 
-                # print every log_interval mini-batches
-                print('--- %.2f seconds --- device: %s --- [%d, %5d, %9d data points in total] epoch loss: %.9f, iteration loss: %.9f current loss: %.9f ; Saving checkpoint: %s ...' %
-                      (time.time() - start_time, local_device, epoch + 1, i + 1, i*args.batch_size, epoch_loss / (i+1), running_loss / args.log_interval, loss.item(), checkpoint_tag))
+                # run validation
+                # Get the length of the dataset
+                num_ranks = model_engine.dp_world_size
 
-                os.makedirs(save_dir, exist_ok=True)
+                local_dataset = torch.utils.data.Subset(valid_set, list(range(local_rank, len(valid_set), num_ranks)))
+                local_loader = torch.utils.data.DataLoader(local_dataset, batch_size=int(args.batch_size/num_ranks), shuffle=False, num_workers=0, pin_memory=True)
+                validation_loss = 0
+                with torch.no_grad():
+                    for j, data in enumerate(local_loader):
+                        inputs, labels, filenames = (
+                            data[0].type(args.dtype_torch).to(local_device),
+                            data[1].type(args.dtype_torch).to(local_device),
+                            data[2])
+
+                        model_outputs = model_engine(model_wrapper.input_preprocess(inputs))
+                        outputs = model_wrapper.output_postprocess(model_outputs)
+                        labels = model_wrapper.labels_preprocess(labels)
+
+                        loss = criterion(outputs, labels)
+
+                        validation_loss += loss.item()
+
+                validation_loss /= j+1
+                deepspeed.dist.reduce(torch.tensor(validation_loss, device=local_device), 0, op=deepspeed.dist.ReduceOp.SUM)
+
+                # print every log_interval mini-batches
+                print('--- %.2f seconds --- device: %s --- [%d, %5d, %9d data points in total] epoch loss: %.9f, iteration loss: %.9f current loss: %.9f validation loss: %.9f; Saving checkpoint: %s ...' %
+                      (time.time() - start_time, local_device, epoch + 1, i + 1, i*args.batch_size, epoch_loss / (i+1), running_loss / args.log_interval, loss.item(), validation_loss, checkpoint_tag))
+
+                os.makedirs(paths.save_dir, exist_ok=True)
                 #torch.save(model_engine.module.state_dict(), checkpoint_filename)
-                model_engine.save_checkpoint(save_dir, tag=checkpoint_tag)
+                model_engine.save_checkpoint(paths.save_dir, tag=checkpoint_tag)
 
                 metadata_dto = TrainingMetadataDto(
                     time=datetime.now().isoformat(),
@@ -235,6 +289,7 @@ if __name__ == '__main__':
                     epoch_loss=epoch_loss / (i+1),
                     running_loss=running_loss / args.log_interval,
                     loss=loss.item(),
+                    valid_loss=validation_loss,
                     checkpoint_tag=checkpoint_tag
                 )
                 training_metadata.append(metadata_dto)

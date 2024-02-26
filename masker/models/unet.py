@@ -3,6 +3,8 @@ from collections import OrderedDict
 import torch
 import torch.nn as nn
 
+from masker.models.model_wrapper import ModelWrapper
+
 
 class UNet(nn.Module):
 
@@ -96,3 +98,20 @@ class UNet(nn.Module):
                 ]
             )
         )
+
+class UNetWrapper(ModelWrapper):
+    def __init__(self, m):
+        super().__init__(m)
+        self.model = UNet(1, 1, 8)
+
+    def get_model(self):
+        return self.model
+
+    def input_preprocess(self, x):
+        return x
+
+    def output_postprocess(self, x):
+        return x
+
+    def labels_preprocess(self, x):
+        return x

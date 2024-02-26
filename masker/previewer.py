@@ -25,7 +25,7 @@ class Previewer:
         fig, axs = plt.subplots(3, 1, figsize=(10, 10))
 
         # Plot the input.
-        im1 = axs[0].imshow(input, cmap="inferno", vmin=-1.0, vmax=1.0, origin='lower')
+        im1 = axs[0].imshow(input, cmap="inferno", vmin=-1, vmax=1, origin='lower')
         axs[0].set_title('Input - ' + filename)
         fig.colorbar(im1, ax=axs[0], orientation='vertical')
         print(filename)
@@ -44,17 +44,32 @@ class Previewer:
 
     def preview_metadata(self, metadata_file):
         training_metadata = TrainingMetadata(metadata_file)
-        list = training_metadata.read()
+        data_list = training_metadata.read()
 
-        local_ranks = set([x.local_rank for x in list])
+        local_ranks = set([x.local_rank for x in data_list])
 
-        fig, axs = plt.subplots(1, 1, figsize=(10, 10))
+        fig, axs = plt.subplots(1, 3, figsize=(20, 10))  # Changed from 1,1 to 1,2 to create two columns
 
-        axs.set_title('Epoch Loss')
-        axs.set_xlabel('Iteration')
-        axs.set_ylabel('Loss')
-
+        # Plot for Epoch Loss
+        axs[0].set_title('Epoch Loss')
+        axs[0].set_xlabel('Iteration')
+        axs[0].set_ylabel('Loss')
         for local_rank in local_ranks:
-            axs.plot([x.epoch_loss for x in list if x.local_rank == local_rank])
+            axs[0].plot([x.epoch_loss for x in data_list if x.local_rank == local_rank])
+
+        # Additional plot for x.loss
+        axs[1].set_title('Loss for each iteration')
+        axs[1].set_xlabel('Iteration')
+        axs[1].set_ylabel('Loss')
+        for local_rank in local_ranks:
+            axs[1].plot([x.loss for x in data_list if
+                         x.local_rank == local_rank])
+
+        # Additional plot for x.loss
+        axs[2].set_title('Validation loss')
+        axs[2].set_xlabel('Iteration')
+        axs[2].set_ylabel('Loss')
+        axs[2].plot([x.valid_loss for x in data_list if
+                     x.local_rank == 0])
 
         plt.show()

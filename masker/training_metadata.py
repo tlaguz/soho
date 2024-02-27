@@ -14,6 +14,7 @@ class TrainingMetadataDto:
     loss: float
     valid_loss: float
     checkpoint_tag: str
+    lr: float = 0.0
 
 # used to read and save training metadata
 # file contains one dataclass object per line

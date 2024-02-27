@@ -24,21 +24,25 @@ class Previewer:
         # Create a 3x1 grid of plots.
         fig, axs = plt.subplots(3, 1, figsize=(10, 10))
 
+        axs_input = axs[0]
+        axs_label = axs[1]
+        axs_output = axs[2]
+
         # Plot the input.
-        im1 = axs[0].imshow(input, cmap="inferno", vmin=-1, vmax=1, origin='lower')
-        axs[0].set_title('Input - ' + filename)
-        fig.colorbar(im1, ax=axs[0], orientation='vertical')
+        im1 = axs_input.imshow(input, cmap="inferno", vmin=-1, vmax=1, origin='lower')
+        axs_input.set_title('Input - ' + filename)
+        fig.colorbar(im1, ax=axs_input, orientation='vertical')
         print(filename)
 
         # Plot the label.
-        im2 = axs[1].imshow(label, cmap='gray', vmin=0.0, vmax=1.00, origin='lower')
-        axs[1].set_title('Label')
-        fig.colorbar(im2, ax=axs[1], orientation='vertical')
+        im2 = axs_label.imshow(label, cmap='gray', vmin=0.0, vmax=1.00, origin='lower')
+        axs_label.set_title('Label')
+        fig.colorbar(im2, ax=axs_label, orientation='vertical')
 
         # Plot the output.
-        im3 = axs[2].imshow(output, cmap='gray', vmin=0.0, vmax=1.00, origin='lower')
-        axs[2].set_title('Output')
-        fig.colorbar(im3, ax=axs[2], orientation='vertical')
+        im3 = axs_output.imshow(output, cmap='gray', vmin=0.0, vmax=1.00, origin='lower')
+        axs_output.set_title('Output')
+        fig.colorbar(im3, ax=axs_output, orientation='vertical')
 
         plt.show()
 
@@ -48,28 +52,36 @@ class Previewer:
 
         local_ranks = set([x.local_rank for x in data_list])
 
-        fig, axs = plt.subplots(1, 3, figsize=(20, 10))  # Changed from 1,1 to 1,2 to create two columns
+        fig, axs = plt.subplots(1, 4, figsize=(20, 10))
 
-        # Plot for Epoch Loss
-        axs[0].set_title('Epoch Loss')
-        axs[0].set_xlabel('Iteration')
-        axs[0].set_ylabel('Loss')
-        for local_rank in local_ranks:
-            axs[0].plot([x.epoch_loss for x in data_list if x.local_rank == local_rank])
+        axs_loss = axs[0]
+        axs_iter_loss = axs[1]
+        axs_valid_loss = axs[2]
+        axs_lr = axs[3]
 
-        # Additional plot for x.loss
-        axs[1].set_title('Loss for each iteration')
-        axs[1].set_xlabel('Iteration')
-        axs[1].set_ylabel('Loss')
+        axs_loss.set_title('Epoch Loss')
+        axs_loss.set_xlabel('Iteration')
+        axs_loss.set_ylabel('Loss')
         for local_rank in local_ranks:
-            axs[1].plot([x.loss for x in data_list if
+            axs_loss.plot([x.epoch_loss for x in data_list if x.local_rank == local_rank])
+
+        axs_iter_loss.set_title('Loss for each iteration')
+        axs_iter_loss.set_xlabel('Iteration')
+        axs_iter_loss.set_ylabel('Loss')
+        for local_rank in local_ranks:
+            axs_iter_loss.plot([x.loss for x in data_list if
                          x.local_rank == local_rank])
 
-        # Additional plot for x.loss
-        axs[2].set_title('Validation loss')
-        axs[2].set_xlabel('Iteration')
-        axs[2].set_ylabel('Loss')
-        axs[2].plot([x.valid_loss for x in data_list if
+        axs_valid_loss.set_title('Validation loss')
+        axs_valid_loss.set_xlabel('Iteration')
+        axs_valid_loss.set_ylabel('Loss')
+        axs_valid_loss.plot([x.valid_loss for x in data_list if
                      x.local_rank == 0])
+
+        axs_lr.set_title('Learning rate')
+        axs_lr.set_xlabel('Iteration')
+        axs_lr.set_ylabel('Learning rate')
+        axs_lr.plot([x.lr for x in data_list if
+             x.local_rank == 0])
 
         plt.show()

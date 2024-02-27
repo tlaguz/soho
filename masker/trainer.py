@@ -290,7 +290,8 @@ if __name__ == '__main__':
                     running_loss=running_loss / args.log_interval,
                     loss=loss.item(),
                     valid_loss=validation_loss,
-                    checkpoint_tag=checkpoint_tag
+                    checkpoint_tag=checkpoint_tag,
+                    lr=optimizer.param_groups[0]['lr']
                 )
                 training_metadata.append(metadata_dto)
 

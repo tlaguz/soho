@@ -73,7 +73,7 @@ class Animator:
 
             model_inference = ModelInference(model_path)
 
-        fig, axs = plt.subplots(2, 3)
+        fig, axs = plt.subplots(2, 3, figsize=(20, 10))
 
         fig.suptitle(' ; '.join(yhts))
 
@@ -189,4 +189,7 @@ class Animator:
             fig.colorbar(im_label, ax=axs_training_label, orientation='vertical')
 
         ani = animation.ArtistAnimation(fig, ims, interval=200, blit=True)
+
+        ani.save("animation.gif", writer='imagemagick')
+
         plt.show()

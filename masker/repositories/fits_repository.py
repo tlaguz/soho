@@ -32,7 +32,14 @@ class FitsRepository:
     def get_fits(self, filename):
         cursor = self.dbconn.cursor()
         cursor.execute("""
-        SELECT * FROM fits WHERE filename = ?
+        SELECT 
+          fits.filename,
+          fits.date,
+          fits.date2,
+          fits.detector,
+          fits.naxis1,
+          fits.naxis2
+        FROM fits WHERE filename = ?
         """, (filename,))
         result = cursor.fetchone()
         return FitsDto(*result) if result is not None else None

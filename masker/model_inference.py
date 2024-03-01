@@ -23,7 +23,9 @@ class ModelInference:
     def do_inference(self, input_tensor, label_tensor = None):
         input_tensor = input_tensor.to(self.device)
         input_tensor = self.model_wrapper.input_preprocess(input_tensor)
-        output_tensor = self.model(input_tensor)
+        with torch.no_grad():
+            output_tensor = self.model(input_tensor)
+
         output_tensor = self.model_wrapper.output_postprocess(output_tensor)
 
         loss = 0

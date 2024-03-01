@@ -4,6 +4,7 @@ import sqlite3
 from dbstruct import create_db
 from fits_manager import fits_manager
 from masker.animator import Animator
+from masker.dataset_previewer import DatasetPreviewer
 from masker.datasets.cache_warmer import CacheWarmer
 from masker.datasets.cached_dataset import CachedDataset
 from masker.datasets.create_dataset import create_dataset, create_validation_dataset
@@ -26,6 +27,7 @@ parser.add_argument('--animate', action='store_true', help='Animate specified ob
 parser.add_argument('--train-status', action='store_true', help='Prints plots of the training status of the models')
 parser.add_argument('--warm-cache', action='store_true', help='Warm up the cache')
 parser.add_argument('--drop-cache', action='store_true', help='Drop the cache')
+parser.add_argument('--preview-dataset', action='store_true', help='Preview the dataset')
 parser.add_argument('--yht', action='append', help='YHT file to animate')
 parser.add_argument('--model', action='append', help='Model path to use for animation')
 
@@ -80,6 +82,11 @@ if __name__ == '__main__':
         shutil.rmtree(paths.train_cache, ignore_errors=True)
 
         print("Caches dropped")
+        exit(0)
+
+    if args.preview_dataset:
+        previewer = DatasetPreviewer(dbconn, args.model[0])
+        previewer.mainloop()
         exit(0)
 
     parser.print_help()

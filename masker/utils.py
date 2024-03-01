@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
 import numpy as np
+import scipy
 from skimage import exposure
 
 @dataclass
@@ -88,6 +89,19 @@ def normalize_by_corner_statistics(image, box_size=32, bot = 2, top = 99):
 
     return image
 
+
+def rotate_image_by_fits_header(image, header):
+    return image #rotation by header is disabled.
+    center = (header["CRPIX1"], header["CRPIX2"])
+    a_deg = header['CROTA1']
+
+    #print(f"Rotating by {a_deg} degrees around {center}")
+    center_shift = np.array(image.shape)/2. - np.array(center)
+    tform_center = scipy.ndimage.shift(image, center_shift)
+    rotated = scipy.ndimage.rotate(tform_center, a_deg, reshape=False, mode='constant', cval=0)
+    tform_uncenter = scipy.ndimage.shift(rotated, -center_shift)
+
+    return tform_uncenter
 
 # https://www.mssl.ucl.ac.uk/grid/iau/extra/solarsoft/ssw_standards.html
 def rotate_by_fits_header(i, j, header, side = 1):

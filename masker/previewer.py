@@ -1,4 +1,5 @@
 import matplotlib
+import numpy as np
 import torch
 from matplotlib import pyplot as plt
 
@@ -58,6 +59,27 @@ class Previewer:
         axs_iter_loss = axs[1]
         axs_valid_loss = axs[2]
         axs_lr = axs[3]
+
+        previous_epochs = {}  # Previous epoch for each local rank
+        losses_per_epoch = {}  # Average of losses for each epoch
+
+        for i, obj in enumerate(data_list):
+            if obj.local_rank not in previous_epochs or obj.epoch > previous_epochs[obj.local_rank]:
+                previous_epochs[obj.local_rank] = obj.epoch
+
+                if losses_per_epoch.get(obj.epoch) is None:
+                    losses_per_epoch[obj.epoch] = []
+
+                losses_per_epoch[obj.epoch].append((i, obj.epoch_loss))
+
+        epoch_x_coords = []
+        epoch_y_coords = []
+        for epoch, loss_data in losses_per_epoch.items():
+            i, epoch_loss = zip(*loss_data)
+            epoch_x_coords.append(np.average(i)/len(local_ranks))
+            epoch_y_coords.append(sum(epoch_loss) / len(epoch_loss))
+
+        axs_loss.scatter(epoch_x_coords, epoch_y_coords, color='red')
 
         axs_loss.set_title('Epoch Loss')
         axs_loss.set_xlabel('Iteration')

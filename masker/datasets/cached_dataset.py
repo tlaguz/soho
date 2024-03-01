@@ -2,7 +2,7 @@ import collections
 import os
 import pickle
 from torch.utils.data import Dataset
-
+import torch.utils.data
 
 class CachedDataset(Dataset):
     def __init__(self,
@@ -10,9 +10,17 @@ class CachedDataset(Dataset):
                  cache_directory: str,
                  ):
         self.dataset = dataset
-        self.cache_directory = cache_directory
+        self.cache_directory = cache_directory + "/" + self.get_cache_name()
 
         os.makedirs(self.cache_directory, exist_ok=True)
+
+    def get_cache_name(self):
+        if isinstance(self.dataset, torch.utils.data.Subset):
+            cn = self.dataset.dataset.get_cache_name()
+        else:
+            cn = self.dataset.get_cache_name()
+
+        return "cached_" + cn
 
     def __len__(self):
         return len(self.dataset)

@@ -6,6 +6,14 @@ class AugmentedDataset(Dataset):
     def __init__(self, dataset: torch.utils.data.Dataset):
         self.dataset = dataset
 
+    def get_cache_name(self):
+        if isinstance(self.dataset, torch.utils.data.Subset):
+            cn = self.dataset.dataset.get_cache_name()
+        else:
+            cn = self.dataset.get_cache_name()
+
+        return "augmented_" + cn
+
     def __getitem__(self, idx: int):
         base_idx = idx // 8
         transformed_idx = idx % 8

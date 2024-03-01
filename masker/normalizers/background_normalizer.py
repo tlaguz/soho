@@ -5,7 +5,7 @@ from masker.normalizers.normalizer import Normalizer
 
 
 class BackgroundNormalizer(Normalizer):
-    def __init__(self, box_size=32):
+    def __init__(self, box_size=128):
         self.box_size = box_size
 
     def _get_background_level(self, image):
@@ -20,10 +20,9 @@ class BackgroundNormalizer(Normalizer):
             image[h - box_size:h, w - box_size:w]  # Bottom-right box
         ]
 
-        # Gather pixels in the corners
-        corner_pixels = np.concatenate([box.ravel() for box in boxes])
+        per_box = [np.mean(box) for box in boxes]
 
-        return corner_pixels.mean()
+        return np.median(per_box)
 
     def normalize_observation(self, image, header):
         bg_level = self._get_background_level(image)

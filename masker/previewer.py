@@ -70,22 +70,32 @@ class Previewer:
                 if losses_per_epoch.get(obj.epoch) is None:
                     losses_per_epoch[obj.epoch] = []
 
-                losses_per_epoch[obj.epoch].append((i, obj.epoch_loss))
+                losses_per_epoch[obj.epoch].append((i, obj))
 
         epoch_x_coords = []
-        epoch_y_coords = []
+        epoch_loss_y_coords = []
+        iter_loss_y_coords = []
+        valid_loss_y_coords = []
+        lr_y_coords = []
         for epoch, loss_data in losses_per_epoch.items():
-            i, epoch_loss = zip(*loss_data)
+            i, objs = zip(*loss_data)
+            objs = list(objs)
+            epoch_losses = [x.epoch_loss for x in objs]
+            iter_losses = [x.loss for x in objs]
+            valid_losses = [x.valid_loss for x in objs]
+            lrs = [x.lr for x in objs]
             epoch_x_coords.append(np.average(i)/len(local_ranks))
-            epoch_y_coords.append(sum(epoch_loss) / len(epoch_loss))
-
-        axs_loss.scatter(epoch_x_coords, epoch_y_coords, color='red')
+            epoch_loss_y_coords.append(sum(epoch_losses) / len(epoch_losses))
+            iter_loss_y_coords.append(sum(iter_losses) / len(iter_losses))
+            valid_loss_y_coords.append(sum(valid_losses) / len(valid_losses))
+            lr_y_coords.append(sum(lrs) / len(lrs))
 
         axs_loss.set_title('Epoch Loss')
         axs_loss.set_xlabel('Iteration')
         axs_loss.set_ylabel('Loss')
         for local_rank in local_ranks:
             axs_loss.plot([x.epoch_loss for x in data_list if x.local_rank == local_rank])
+        axs_loss.scatter(epoch_x_coords, epoch_loss_y_coords, color='red')
 
         axs_iter_loss.set_title('Loss for each iteration')
         axs_iter_loss.set_xlabel('Iteration')
@@ -93,17 +103,20 @@ class Previewer:
         for local_rank in local_ranks:
             axs_iter_loss.plot([x.loss for x in data_list if
                          x.local_rank == local_rank])
+        axs_iter_loss.scatter(epoch_x_coords, iter_loss_y_coords, color='red')
 
         axs_valid_loss.set_title('Validation loss')
         axs_valid_loss.set_xlabel('Iteration')
         axs_valid_loss.set_ylabel('Loss')
         axs_valid_loss.plot([x.valid_loss for x in data_list if
                      x.local_rank == 0])
+        axs_valid_loss.scatter(epoch_x_coords, valid_loss_y_coords, color='red')
 
         axs_lr.set_title('Learning rate')
         axs_lr.set_xlabel('Iteration')
         axs_lr.set_ylabel('Learning rate')
         axs_lr.plot([x.lr for x in data_list if
              x.local_rank == 0])
+        axs_lr.scatter(epoch_x_coords, lr_y_coords, color='red')
 
         plt.show()

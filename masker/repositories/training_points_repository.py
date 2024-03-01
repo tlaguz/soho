@@ -58,3 +58,25 @@ class TrainingPointsRepository:
         where id = ?
         """, (id,))
         return cursor.fetchone()
+
+    def get_training_data_by_filename(self, filename, detector):
+        cursor = self.dbconn.cursor()
+        cursor.execute(f"""
+        select 
+            id, 
+            filename,
+            filename_prev,
+            date,
+            date2, 
+            detector, 
+            naxis1, 
+            naxis2, 
+            filename_yht, 
+            observer, 
+            aggregated_row, 
+            aggregated_col, 
+            aggregated_height
+        from {self.detector_to_table(detector)}
+        where filename = ?
+        """, (filename,))
+        return cursor.fetchone()

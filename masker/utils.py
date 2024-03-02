@@ -28,6 +28,22 @@ def get_paths():
         repository_cache = '/mnt/trunk/tlaguz/soho/repository_cache/'
     )
 
+def parameters_to_string(params):
+    params_str = ''
+    for param in params:
+        if type(param) == float:
+            params_str += f"{param:.4f}"
+        elif type(param) == int:
+            params_str += f"{param:d}"
+        elif type(param) == str:
+            params_str += param
+        elif type(param) == bool:
+            params_str += f"{int(param)}"
+        else:
+            raise Exception(f"Type {type(param)} not supported")
+
+    return params_str
+
 def normalize_by_statistics(image, bot = 2, top = 99):
     # Convert to float
     image = image

@@ -238,6 +238,7 @@ if __name__ == '__main__':
             model_engine.step()
 
             # print statistics
+            iter_loss = loss.item()
             running_loss += loss.item()
             epoch_loss += loss.item()
 
@@ -288,7 +289,7 @@ if __name__ == '__main__':
                     iteration=i + 1,
                     epoch_loss=epoch_loss / (i+1),
                     running_loss=running_loss / args.log_interval,
-                    loss=loss.item(),
+                    loss=iter_loss,
                     valid_loss=validation_loss,
                     checkpoint_tag=checkpoint_tag,
                     lr=optimizer.param_groups[0]['lr']

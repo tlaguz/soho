@@ -20,7 +20,7 @@ def create_dataset(dbconn, dtype="fp32", augment=True):
 
 def create_validation_dataset(dbconn, dtype="fp32", augment=True):
     paths = get_paths()
-    ds = FitsDataset(dbconn, running_diff=True, mask_disk=True, dtype=dtype)
+    ds = FitsDataset(dbconn, running_diff=True, mask_disk=False, dtype=dtype)
     ds = torch.utils.data.Subset(ds, list(range(110000, 110000+250)))
     ds = CachedDataset(ds, paths.valid_cache)
     if augment:

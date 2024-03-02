@@ -1,5 +1,5 @@
 class ModelWrapper():
-    def __init__(self, m):
+    def __init__(self):
         pass
 
     def get_model(self):

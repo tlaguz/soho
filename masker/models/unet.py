@@ -100,18 +100,19 @@ class UNet(nn.Module):
         )
 
 class UNetWrapper(ModelWrapper):
-    def __init__(self, m):
-        super().__init__(m)
+    def __init__(self):
+        super().__init__()
         self.model = UNet(1, 1, 8)
 
     def get_model(self):
         return self.model
 
     def input_preprocess(self, x):
-        return x
+        return x.view(-1, 1, 1024, 1024)
 
     def output_postprocess(self, x):
-        return x
+        outputs = x.view(-1, 1024, 1024)
+        return outputs
 
     def labels_preprocess(self, x):
-        return x
+        return x.view(-1, 1024, 1024)

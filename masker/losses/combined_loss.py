@@ -19,6 +19,10 @@ def dice_coefficient(input, target):
     return (2. * intersection + smooth) / (iflat.sum(1) + tflat.sum(1) + smooth)
 
 
+def dice_coefficient_loss(input, target):
+    return 1 - dice_coefficient(input, target).mean()
+
+
 # https://arxiv.org/abs/2209.06078
 def combined_loss(input, target, alpha):
     target = target.to(input.dtype)

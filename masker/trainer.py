@@ -276,10 +276,6 @@ if __name__ == '__main__':
                 print('--- %.2f seconds --- device: %s --- [%d, %5d, %9d data points in total] epoch loss: %.9f, iteration loss: %.9f current loss: %.9f validation loss: %.9f; Saving checkpoint: %s ...' %
                       (time.time() - start_time, local_device, epoch + 1, i + 1, i*args.batch_size, epoch_loss / (i+1), running_loss / args.log_interval, loss.item(), validation_loss, checkpoint_tag))
 
-                os.makedirs(paths.save_dir, exist_ok=True)
-                #torch.save(model_engine.module.state_dict(), checkpoint_filename)
-                model_engine.save_checkpoint(paths.save_dir, tag=checkpoint_tag)
-
                 metadata_dto = TrainingMetadataDto(
                     time=datetime.now().isoformat(),
                     time_spent=time.time() - start_time,
@@ -295,6 +291,10 @@ if __name__ == '__main__':
                     lr=optimizer.param_groups[0]['lr']
                 )
                 training_metadata.append(metadata_dto)
+
+                os.makedirs(paths.save_dir, exist_ok=True)
+                # torch.save(model_engine.module.state_dict(), checkpoint_filename)
+                model_engine.save_checkpoint(paths.save_dir, tag=checkpoint_tag, client_state=metadata_dto.__dict__)
 
                 running_loss = 0.0
 

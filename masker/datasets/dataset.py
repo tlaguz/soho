@@ -8,7 +8,7 @@ from masker.fits_loader import FitsLoader
 from masker.labelers.create_labeler import create_labeler
 from masker.normalizers.create_normalizer import create_normalizer
 from masker.repositories.training_points_repository import TrainingPointsRepository
-from masker.utils import create_masking_circle
+from masker.utils import create_masking_circle, parameters_to_string
 
 
 class FitsDataset(Dataset):
@@ -29,7 +29,9 @@ class FitsDataset(Dataset):
         self.normalizer = create_normalizer()
 
     def get_cache_name(self):
-        return "running_diff_single"
+        params = [self.running_diff, self.mask_disk, self.detector]
+        params_txt = parameters_to_string(params)
+        return f"rdiff_{params_txt}_{self.labeler.get_cache_name()}"
 
     def __len__(self):
         return self.training_points_repository.get_training_data_len(self.detector)

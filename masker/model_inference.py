@@ -8,6 +8,7 @@ class ModelInference:
         self.model_wrapper = create_model()
         self.model = self.model_wrapper.get_model()
 
+        #self.device = torch.device("cuda:0")
         self.device = torch.device("cpu")
 
         # load pytorch model
@@ -17,6 +18,7 @@ class ModelInference:
 
         self.model.load_state_dict(pt)
         self.model.to(self.device)
+        self.model.eval()
 
         self.loss = create_loss()
 

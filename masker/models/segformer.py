@@ -6,10 +6,11 @@ from masker.models.model_wrapper import ModelWrapper
 
 
 class SegFormerWrapper(ModelWrapper):
-    def __init__(self):
-        super().__init__(self)
+    def __init__(self, channels=1):
+        super().__init__()
+        self.channels = channels
         config = SegformerConfig(
-            num_channels=1,
+            num_channels=channels,
             num_labels=1,
             num_encoder_blocks=4,
             depths=[2, 2, 2, 2],
@@ -39,13 +40,15 @@ class SegFormerWrapper(ModelWrapper):
         return self.model
 
     def input_preprocess(self, x):
-        return x.view(-1, 1, 1024, 1024)
+        return x.view(-1, self.channels, 1024, 1024)
 
     def output_postprocess(self, x):
         outputs = x.logits
-        outputs = torch.sigmoid(outputs)
-        outputs = outputs.view(-1, 256, 256)
+        #outputs = torch.sigmoid(outputs)
+        outputs = outputs.view(-1, 1, 256, 256)
         return outputs
 
     def labels_preprocess(self, x):
-        return F.interpolate(x.view(-1, 1, 1024, 1024), size=(256, 256), mode='nearest').view(-1, 256, 256)
+        x = F.interpolate(x.view(-1, 1, 1024, 1024), size=(256, 256), mode='nearest').view(-1, 1, 256, 256)
+        #x = torch.stack((x, 1 - x), dim=1)
+        return x

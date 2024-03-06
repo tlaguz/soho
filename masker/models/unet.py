@@ -102,7 +102,7 @@ class UNet(nn.Module):
 class UNetWrapper(ModelWrapper):
     def __init__(self):
         super().__init__()
-        self.model = UNet(1, 1, 8)
+        self.model = UNet(1, 1, 32)
 
     def get_model(self):
         return self.model

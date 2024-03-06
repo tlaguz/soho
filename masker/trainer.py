@@ -14,11 +14,8 @@ import torch.nn.functional as F
 import deepspeed
 from deepspeed import get_accelerator
 
-from masker.datasets.create_dataset import create_dataset, create_validation_dataset
-from masker.losses.loss_factory import create_loss
-from masker.models.model_factory import create_model
-
 from masker.previewer import Previewer
+from masker.trainer_config import create_dataset, create_loss, create_model, create_validation_dataset
 from masker.training_metadata import TrainingMetadata, TrainingMetadataDto
 from masker.utils import get_paths
 
@@ -42,7 +39,7 @@ def add_argument():
     # train
     parser.add_argument('-b',
                         '--batch_size',
-                        default=7,
+                        default=2,
                         type=int,
                         help='mini-batch size (default: 16)')
     parser.add_argument('-e',
@@ -129,7 +126,7 @@ if __name__ == '__main__':
         "optimizer": {
             "type": "Adam",
             "params": {
-                "lr": 0.001,
+                "lr": 0.0005,
                 "betas": [
                     0.9,
                     0.999
@@ -139,11 +136,13 @@ if __name__ == '__main__':
             }
         },
         "scheduler": {
-            "type": "WarmupLR",
+            "type": "WarmupDecayLR",
             "params": {
-                "warmup_min_lr": 0,
-                "warmup_max_lr": 0.001,
-                "warmup_num_steps": 1000
+                "total_num_steps": 10000,
+                "warmup_min_lr": 0.00001,
+                "warmup_max_lr": 0.0001,
+                "warmup_num_steps": 100,
+                "last_batch_iteration": -1
             }
         },
         "gradient_clipping": 1.0,
@@ -173,9 +172,6 @@ if __name__ == '__main__':
         }
     }
 
-    # disable scheduler
-    ds_config['scheduler'] = {}
-
     dbconn = sqlite3.connect('/home/tlaguz/db.sqlite3', timeout=300000.0)
     dbconn.row_factory = sqlite3.Row
 
@@ -187,7 +183,7 @@ if __name__ == '__main__':
 
     training_metadata = TrainingMetadata(os.path.join(paths.save_dir, "training_metadata.json"))
 
-    train_set = create_dataset(dbconn, args.dtype)
+    train_set = create_dataset(dbconn, args.dtype, augment=True)
     train_sampler = torch.utils.data.distributed.DistributedSampler(
         train_set,
         num_replicas=torch.distributed.get_world_size(),
@@ -199,33 +195,52 @@ if __name__ == '__main__':
         num_workers=1,
         pin_memory=True,
         sampler=train_sampler)
-    valid_set = create_validation_dataset(dbconn, args.dtype)
+    valid_set = create_validation_dataset(dbconn, args.dtype, False)
+    # @todo validation set should be distributed
+
+    iterations_per_epoch = len(train_loader)
+    total_iterations = iterations_per_epoch * args.epochs
+
+    ds_config['scheduler']['params']['total_num_steps'] = total_iterations
+    ds_config['scheduler']['params']['warmup_num_steps'] = iterations_per_epoch
+
+    ds_config['scheduler'] = {}
 
     model_engine, optimizer, trainloader, __ = deepspeed.initialize(
         args=args, model=net, model_parameters=parameters, training_data=train_set, config=ds_config)
 
-    if args.checkpoint is not None:
-        model_engine.load_checkpoint(args.checkpoint)
+    load_path, client_state = model_engine.load_checkpoint(args.checkpoint) if args.checkpoint is not None else (None, None)
+    if load_path is not None:
+        client_state_dict = {k: v for k, v in client_state.items() if
+                             k in TrainingMetadataDto.__annotations__}
+        client_state = TrainingMetadataDto(**client_state_dict)
 
     local_device = get_accelerator().device_name(model_engine.local_rank)
     local_rank = model_engine.local_rank
 
-    criterion = create_loss()
+    criterion = create_loss(local_device)
 
     start_time = time.time()
 
-    for epoch in range(args.epochs):  # loop over the dataset multiple times
+    epoch_range = range(args.epochs) if client_state is None else range(client_state.epoch, args.epochs + client_state.epoch)
+    print(f"Starting training on {local_device} with local rank {local_rank} and global rank {torch.distributed.get_rank()} from epoch {epoch_range.start} to {epoch_range.stop}...")
+    for epoch in epoch_range:  # loop over the dataset multiple times
         epoch_loss = 0.0
         running_loss = 0.0
 
         train_sampler.set_epoch(epoch)
 
         for i, data in enumerate(train_loader):
-            # get the inputs; data is a list of [inputs, labels]
             inputs, labels, filenames = (
-                data[0].type(args.dtype_torch).to(local_device),
+                data[0],
                 data[1].type(args.dtype_torch).to(local_device),
                 data[2])
+
+            if isinstance(inputs, list):
+                inputs = torch.stack(inputs)
+                inputs = inputs.transpose(0, 1)
+
+            inputs = inputs.type(args.dtype_torch).to(local_device)
 
             model_outputs = model_engine(model_wrapper.input_preprocess(inputs))
             outputs = model_wrapper.output_postprocess(model_outputs)
@@ -257,9 +272,15 @@ if __name__ == '__main__':
                 with torch.no_grad():
                     for j, data in enumerate(local_loader):
                         inputs, labels, filenames = (
-                            data[0].type(args.dtype_torch).to(local_device),
+                            data[0],
                             data[1].type(args.dtype_torch).to(local_device),
                             data[2])
+
+                        if isinstance(inputs, list):
+                            inputs = torch.stack(inputs)
+                            inputs = inputs.transpose(0, 1)
+
+                        inputs = inputs.type(args.dtype_torch).to(local_device)
 
                         model_outputs = model_engine(model_wrapper.input_preprocess(inputs))
                         outputs = model_wrapper.output_postprocess(model_outputs)

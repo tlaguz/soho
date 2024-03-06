@@ -5,11 +5,10 @@ from astropy.io import fits
 from torch.utils.data import Dataset
 
 from masker.fits_loader import FitsLoader
-from masker.labelers.create_labeler import create_labeler
-from masker.normalizers.create_normalizer import create_normalizer
 from masker.repositories.fits_repository import FitsRepository, FitsDto
 from masker.repositories.training_points_repository import TrainingPointsRepository
-from masker.utils import create_masking_circle, rotate_image_by_fits_header
+from masker.trainer_config import create_labeler, create_normalizer
+from masker.utils import create_masking_circle, rotate_image_by_fits_header, parameters_to_string
 
 
 class FitsVideoDataset(Dataset):
@@ -35,7 +34,9 @@ class FitsVideoDataset(Dataset):
         self.normalizer = create_normalizer()
 
     def get_cache_name(self):
-        return f"running_diff_video_{self.frames}"
+        params = [self.running_diff, self.mask_disk, self.detector, self.frames]
+        params_txt = parameters_to_string(params)
+        return f"running_diff_video_{params_txt}_{self.labeler.get_cache_name()}"
 
     def __len__(self):
         return self.training_points_repository.get_training_data_len(self.detector)

@@ -9,10 +9,9 @@ import torch
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 from masker.fits_loader import FitsLoader
-from masker.labelers.create_labeler import create_labeler
 from masker.model_inference import ModelInference
-from masker.normalizers.create_normalizer import create_normalizer
 from masker.repositories.fits_repository import FitsRepository
+from masker.trainer_config import create_labeler, create_normalizer
 from masker.utils import rotate_by_fits_header
 
 matplotlib.use("TkAgg")
@@ -185,15 +184,16 @@ class Animator:
                 #to pytorch tensor
                 model_input = torch.from_numpy(diff)
                 model_output, loss, label = model_inference.do_inference(model_input.unsqueeze(0).unsqueeze(0), label)
+                model_output = torch.sigmoid(model_output)
                 mask = model_output.squeeze(0).squeeze(0).detach().numpy()
 
                 im2 = axs_ml_prediction.imshow(mask, animated=True, origin='lower')
                 im2_text = axs_ml_prediction.text(0, 0, f"Loss {loss.item()}", va="bottom", ha="left", color="yellow")
 
                 residuals = np.subtract(mask, label.squeeze(0))
-                im2_residuals = axs_ml_prediction_residuals.imshow(residuals, vmin=-1, vmax=1, animated=True, origin='lower')
+                im2_residuals = axs_ml_prediction_residuals.imshow(residuals[0], vmin=-1, vmax=1, animated=True, origin='lower')
 
-                im_label = axs_training_label.imshow(label.squeeze(0), vmin=0, vmax=1, animated=True, origin='lower')
+                im_label = axs_training_label.imshow(label.squeeze(0)[0], vmin=0, vmax=1, animated=True, origin='lower')
 
                 img_statistics, img_statistics_list = self._show_ex_pdf(mask, axs_statistics, axs_statistics_x, axs_statistics_y)
             else:

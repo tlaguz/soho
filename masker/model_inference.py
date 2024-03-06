@@ -1,7 +1,7 @@
 import torch
 
-from masker.losses.loss_factory import create_loss
-from masker.models.model_factory import create_model
+from masker.trainer_config import create_model, create_loss
+
 
 class ModelInference:
     def __init__(self, model_name):

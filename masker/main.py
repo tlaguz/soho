@@ -6,9 +6,8 @@ from fits_manager import fits_manager
 from masker.animator import Animator
 from masker.dataset_previewer import DatasetPreviewer
 from masker.datasets.cache_warmer import CacheWarmer
-from masker.datasets.cached_dataset import CachedDataset
-from masker.datasets.create_dataset import create_dataset, create_validation_dataset
 from masker.previewer import Previewer
+from masker.trainer_config import create_dataset, create_validation_dataset
 from masker.utils import get_paths
 from yht_reader import yht_reader
 from yht_manager import yht_manager

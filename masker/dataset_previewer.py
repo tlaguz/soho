@@ -8,9 +8,9 @@ from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import (FigureCanvasTkAgg,
 NavigationToolbar2Tk)
 
-from masker.datasets.create_dataset import create_dataset
 from masker.model_inference import ModelInference
 from masker.normalizers.background_normalizer import BackgroundNormalizer
+from masker.trainer_config import create_dataset
 
 
 class DatasetPreviewer(tk.Tk):
@@ -20,7 +20,6 @@ class DatasetPreviewer(tk.Tk):
         self.model = model
         self.dbconn = dbconn
         self.dataset = create_dataset(dbconn, augment=False)
-        self.model_inference = ModelInference(model)
 
         self.title("Dataset preview")
         self.geometry("1600x800")
@@ -83,13 +82,32 @@ class DatasetPreviewer(tk.Tk):
         self.update_plot()
 
     def run_model(self):
+        self.model_inference = ModelInference(self.model)
+
         input, label, txt = self.dataset[self.dataset_id]
-        model_input = torch.from_numpy(input)
+        if isinstance(input, list):
+            input = [torch.from_numpy(i) for i in input]
+            model_input = torch.stack(input)
+        else:
+            model_input = torch.from_numpy(input)
+
         model_output, loss, label = self.model_inference.do_inference(model_input, label)
-        output = model_output.detach().numpy()
-        imoutput = self.ax_model_output.imshow(output.squeeze(0), vmin=0.0, vmax=1.0, origin='lower')
-        self.figure.colorbar(imoutput, ax=self.ax_model_output)
-        self.ax_model_output.text(0, 0, f"Loss {loss.item()}", va="bottom", ha="left", color="yellow")
+        output = torch.sigmoid(model_output).detach().numpy()
+        output = output.squeeze(0)
+        imoutput = self.ax_model_output.imshow(output[0,:], vmin=0.0, vmax=1.0, origin='lower', animated=True)
+
+        def update(i):
+            imoutput.set_array(output[i,:])
+
+        ani = animation.FuncAnimation(self.figure, update, frames=output.shape[0], repeat=True, interval=500)
+
+        if self.ax_model_output_colorbar is not None:
+            self.ax_model_output_colorbar.remove()
+        if self.ax_model_output_text is not None:
+            self.ax_model_output_text.remove()
+
+        self.ax_model_output_colorbar = self.figure.colorbar(imoutput, ax=self.ax_model_output)
+        self.ax_model_output_text = self.ax_model_output.text(0, 0, f"Loss {loss.item()}", va="bottom", ha="left", color="yellow")
         self.canvas.draw()
 
     def update_plot(self):
@@ -106,6 +124,7 @@ class DatasetPreviewer(tk.Tk):
 
         ax_running_diff.set_title('Running diff')
         if isinstance(input, list):
+            input = input[::-1]
             imdiff = ax_running_diff.imshow(input[0], cmap="inferno", vmin=-0.5, vmax=0.5, origin='lower')
             self.figure.colorbar(imdiff, ax=ax_running_diff)
 
@@ -115,7 +134,10 @@ class DatasetPreviewer(tk.Tk):
             def update(i):
                 data = self._rescale(input[i])
                 imdiff.set_array(data)
-                text.set_text("Frame " + str(-i))
+                if i == len(input) - 1:
+                    text.set_text("Frame " + str(i+1) + " (LAST)")
+                else:
+                    text.set_text("Frame " + str(i+1))
 
             ani = animation.FuncAnimation(self.figure, update, frames=len(input), repeat=True, interval=500)
         else:
@@ -128,6 +150,9 @@ class DatasetPreviewer(tk.Tk):
 
         self.ax_model_output = ax_model_output
         ax_model_output.set_title('Model output')
+
+        self.ax_model_output_colorbar = None
+        self.ax_model_output_text = None
 
         self.canvas.draw()
         self.label_top_title.insert(1.0, txt, "text")

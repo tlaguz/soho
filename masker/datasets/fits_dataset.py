@@ -5,9 +5,8 @@ from astropy.io import fits
 from torch.utils.data import Dataset
 
 from masker.fits_loader import FitsLoader
-from masker.labelers.create_labeler import create_labeler
-from masker.normalizers.create_normalizer import create_normalizer
 from masker.repositories.training_points_repository import TrainingPointsRepository
+from masker.trainer_config import create_labeler, create_normalizer
 from masker.utils import create_masking_circle, parameters_to_string
 
 

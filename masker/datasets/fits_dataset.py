@@ -1,4 +1,5 @@
 import collections
+from dataclasses import dataclass
 
 import numpy as np
 from astropy.io import fits
@@ -10,6 +11,15 @@ from masker.trainer_config import create_labeler, create_normalizer
 from masker.utils import create_masking_circle, parameters_to_string
 
 
+@dataclass
+class FitsDatasetDto:
+    image : np.ndarray
+    image_header : fits.header.Header
+    image_prev : np.ndarray
+    image_prev_header : fits.header.Header
+    label : np.ndarray
+    txt : str
+
 class FitsDataset(Dataset):
     def __init__(self, dbconn, running_diff=False, mask_disk=False, detector='C2', dtype="fp32"):
         if dtype == "bf16":
@@ -20,15 +30,13 @@ class FitsDataset(Dataset):
             self.dtype = np.float32
         self.detector = detector
         self.mask_disk = mask_disk
-        self.running_diff = running_diff
         self.fits_loader = FitsLoader()
         self.dbconn = dbconn
         self.training_points_repository = TrainingPointsRepository(dbconn)
         self.labeler = create_labeler()
-        self.normalizer = create_normalizer()
 
     def get_cache_name(self):
-        params = [self.running_diff, self.mask_disk, self.detector]
+        params = [self.mask_disk, self.detector]
         params_txt = parameters_to_string(params)
         return f"rdiff_{params_txt}_{self.labeler.get_cache_name()}"
 
@@ -48,21 +56,16 @@ class FitsDataset(Dataset):
         hdul = self.fits_loader.get_cached_fits(record["filename"])
         if hdul is None:
             print("Error loading fits file " + record["filename"] + " for id " + str(idx - 1))
-            return np.zeros((1024, 1024), dtype=self.dtype), np.zeros((1024, 1024), dtype=self.dtype), txt
+            image = np.zeros((1024, 1024), dtype=self.dtype)
         else:
             image = hdul[0].data.astype(np.float32)
-            image = self.normalizer.normalize_observation(image, hdul[0].header)
 
-        if self.running_diff:
-            hdul_prev = self.fits_loader.get_cached_fits(record["filename_prev"])
-            if hdul_prev is None:
-                print("Error loading fits file " + record["filename_prev"] + " for id " + str(idx - 1))
-                return np.zeros((1024, 1024), dtype=self.dtype), np.zeros((1024, 1024), dtype=self.dtype), txt
-
+        hdul_prev = self.fits_loader.get_cached_fits(record["filename_prev"])
+        if hdul_prev is None:
+            print("Error loading fits file " + record["filename_prev"] + " for id " + str(idx - 1))
+            image_prev = np.zeros((1024, 1024), dtype=self.dtype)
+        else:
             image_prev = hdul_prev[0].data.astype(np.float32)
-            image_prev = self.normalizer.normalize_observation(image_prev, hdul_prev[0].header)
-            image = image - image_prev
-            image = self.normalizer.normalize_diff(image, hdul[0].header)
 
         if self.mask_disk:
             radius = 180
@@ -76,8 +79,7 @@ class FitsDataset(Dataset):
         cols = list(map(int, record["aggregated_col"].split(",")))
 
         label = self.labeler.label(rows, cols, hdul[0].header)
-        label = self.normalizer.normalize_label(label)
         if np.max(label) == 0:
             print("Label is broken for id " + str(idx - 1))
 
-        return image, label, txt
+        return FitsDatasetDto(image, hdul[0].header, image_prev, hdul_prev[0].header, label, txt)

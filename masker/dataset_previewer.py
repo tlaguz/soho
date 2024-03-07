@@ -25,8 +25,6 @@ class DatasetPreviewer(tk.Tk):
         self.geometry("1600x800")
 
         self.label_top_title = tk.Text(self, height=1, borderwidth=0, highlightthickness=0, relief='flat', bg="white", font=("Arial", 16))
-        #self.label_top_title.bind("<Key>", lambda e: "break")
-        #self.label_top_title.configure(state='disabled')
         self.label_top_title.tag_configure("text", foreground="black")
         self.label_top_title.pack(fill=tk.X, side=tk.TOP)
 
@@ -38,11 +36,13 @@ class DatasetPreviewer(tk.Tk):
         toolbar = NavigationToolbar2Tk(self.canvas, self)
         toolbar.update()
 
+        self.button_refresh = tk.Button(self, text="Refresh", command=self.update_plot)
         self.button_next = tk.Button(self, text="Next", command=self.next_plot)
         self.button_previous = tk.Button(self, text="Previous", command=self.prev_plot)
         self.button_model = tk.Button(self, text="Run model", command=self.run_model)
 
         self.canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+        self.button_refresh.pack(side=tk.RIGHT)
         self.button_next.pack(side=tk.RIGHT)
         self.button_previous.pack(side=tk.RIGHT)
         self.button_model.pack(side=tk.RIGHT)
@@ -53,6 +53,7 @@ class DatasetPreviewer(tk.Tk):
         self.combo_scale.bind("<<ComboboxSelected>>", lambda e: self.update_plot())
 
         self.dataset_id = 0
+        self.dataset_item = None, None, None
 
         self.label_title = tk.Label(self, text="", font=("Arial", 16))
         self.label_title.pack(side=tk.TOP, fill=tk.X)
@@ -84,7 +85,7 @@ class DatasetPreviewer(tk.Tk):
     def run_model(self):
         self.model_inference = ModelInference(self.model)
 
-        input, label, txt = self.dataset[self.dataset_id]
+        input, label, txt = self.dataset_item
         if isinstance(input, list):
             input = [torch.from_numpy(i) for i in input]
             model_input = torch.stack(input)
@@ -120,7 +121,8 @@ class DatasetPreviewer(tk.Tk):
         ax_label = axes[1]
         ax_model_output = axes[2]
 
-        input, label, txt = self.dataset[self.dataset_id]
+        self.dataset_item = self.dataset[self.dataset_id]
+        input, label, txt = self.dataset_item
 
         ax_running_diff.set_title('Running diff')
         if isinstance(input, list):
